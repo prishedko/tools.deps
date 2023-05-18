@@ -141,7 +141,7 @@
 (deftest test-dep-choice
   (fkn/with-libs repo
     (is (= (->> (deps/resolve-deps {:deps {'e1/a {:fkn/version "1"}}} nil) libs->lib-ver)
-           {:a 1, :b 1, :c 2}))))
+           {:a "1", :b "1", :c "2"}))))
 
 ;; -> +a1 -> +d1
 ;; -> +b1 -> -e1 -> -d2
