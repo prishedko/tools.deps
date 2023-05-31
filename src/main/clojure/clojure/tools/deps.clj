@@ -22,7 +22,8 @@
     [clojure.lang PersistentQueue]
     [java.io File InputStreamReader BufferedReader]
     [java.lang ProcessBuilder ProcessBuilder$Redirect]
-    [java.util List]))
+    [java.util List]
+    [java.util.concurrent ExecutorService]))
 
 ;(set! *warn-on-reflection* true)
 
@@ -498,6 +499,7 @@
                        cut-orphans)
          lib-map (lib-paths version-map)
          lib-map' (download-libs executor lib-map deps-map)]
+     (.shutdownNow ^ExecutorService executor)
      (with-meta lib-map' (meta version-map))))
   ;; deprecated arity, retained for backwards compatibility
   ([deps-map args-map settings]

@@ -6,6 +6,7 @@ Changelog
 * next
   * TDEPS-247 - Fix StackOverflow for deps with big fan-out
   * TDEPS-249 - Properly push/pop thread bindings during dep expansion
+  * TDEPS-227 - Shut down dep expansion threads at end of resolve-deps
 * 0.18.1335 on Apr 3, 2023
   * Fix regression in -Spom
 * 0.18.1331 on Mar 31, 2023
