@@ -3,7 +3,7 @@ Changelog
 
 *Also see [Tools and installer changelog](https://github.com/clojure/brew-install/blob/1.10.3/CHANGELOG.md)*
 
-* next
+* 0.18.1349 on May 31, 2023
   * TDEPS-247 - Fix StackOverflow for deps with big fan-out
   * TDEPS-249 - Properly push/pop thread bindings during dep expansion
   * TDEPS-227 - Shut down dep expansion threads at end of resolve-deps
