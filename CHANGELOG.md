@@ -3,6 +3,8 @@ Changelog
 
 *Also see [Tools and installer changelog](https://github.com/clojure/brew-install/blob/1.10.3/CHANGELOG.md)*
 
+* next
+  * TDEPS-247 - Fix StackOverflow for deps with big fan-out
 * 0.18.1335 on Apr 3, 2023
   * Fix regression in -Spom
 * 0.18.1331 on Mar 31, 2023
