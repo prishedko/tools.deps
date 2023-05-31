@@ -68,8 +68,7 @@ For info on using tools.deps as a library, see:
 * [GitHub project](https://github.com/clojure/tools.deps)
 * [How to contribute](https://clojure.org/community/contributing)
 * [Bug Tracker](https://clojure.atlassian.net/browse/TDEPS)
-* [Continuous Integration](https://build.clojure.org/job/tools.deps/)
-* [Compatibility Test Matrix](https://build.clojure.org/job/tools.deps-test-matrix/)
+* [Continuous Integration](https://github.com/clojure/tools.deps/actions/workflows/test.yml)
 
 # Copyright and License
 
