@@ -50,6 +50,11 @@
     ;; maven-settings-builder
     [org.apache.maven.settings.building DefaultSettingsBuilderFactory]
 
+    ;; maven-settings-crypto
+    [org.apache.maven.settings.crypto DefaultSettingsDecrypter DefaultSettingsDecryptionRequest]
+    [org.sonatype.plexus.components.cipher DefaultPlexusCipher]
+    [org.sonatype.plexus.components.sec.dispatcher DefaultSecDispatcher]
+
     ;; plexus-utils
     [org.codehaus.plexus.util.xml Xpp3Dom]))
 
@@ -127,6 +132,24 @@
                 :update update
                 :checksum checksum})))))
 
+(defn- ^RemoteRepository$Builder set-authentication
+  "Creates authentication with support of decryption of server password, and sets it to the repository builder .
+  See [Maven Password Encryption](https://maven.apache.org/guides/mini/guide-encryption.html) for more information."
+  [^RemoteRepository$Builder builder ^Server server]
+  (let [plexus-cipher (DefaultPlexusCipher.)
+        sec-dispatcher (DefaultSecDispatcher. plexus-cipher {} "~/.m2/settings-security.xml")
+        decryption-request (DefaultSettingsDecryptionRequest. server)
+        settings-decrypter (DefaultSettingsDecrypter. sec-dispatcher)
+        decryption-result (.decrypt settings-decrypter decryption-request)
+        decrypted-server (.getServer decryption-result)]
+    (.setAuthentication builder
+                        (-> (AuthenticationBuilder.)
+                            (.addUsername (.getUsername decrypted-server))
+                            (.addPassword (.getPassword decrypted-server))
+                            (.addPrivateKey (.getPrivateKey decrypted-server)
+                                            (.getPassphrase decrypted-server))
+                            (.build)))))
+
 (defn remote-repo
   (^RemoteRepository [repo-entry]
    (remote-repo repo-entry (get-settings)))
@@ -145,12 +168,7 @@
          snapshots (.setSnapshotPolicy (repo-policy name snapshots))
          releases (.setReleasePolicy (repo-policy name releases))
          mirror (.setUrl (.getUrl mirror))
-         server-setting (.setAuthentication
-                          (-> (AuthenticationBuilder.)
-                            (.addUsername (.getUsername server-setting))
-                            (.addPassword (.getPassword server-setting))
-                            (.addPrivateKey (.getPrivateKey server-setting) (.getPassphrase server-setting))
-                            (.build)))
+         server-setting (set-authentication server-setting)
          proxy (.setProxy proxy))
        (.build)))))
 
