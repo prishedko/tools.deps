@@ -17,7 +17,7 @@
     ;; maven-resolver-api
     [org.eclipse.aether RepositorySystem RepositorySystemSession DefaultRepositoryCache DefaultRepositorySystemSession ConfigurationProperties]
     [org.eclipse.aether.artifact Artifact DefaultArtifact]
-    [org.eclipse.aether.repository LocalRepository Proxy RemoteRepository RemoteRepository$Builder RepositoryPolicy]
+    [org.eclipse.aether.repository Authentication LocalRepository Proxy RemoteRepository RemoteRepository$Builder RepositoryPolicy]
     [org.eclipse.aether.graph Dependency Exclusion]
     [org.eclipse.aether.transfer TransferListener TransferEvent]
 
@@ -51,7 +51,7 @@
     [org.apache.maven.settings.building DefaultSettingsBuilderFactory]
 
     ;; maven-settings-crypto
-    [org.apache.maven.settings.crypto DefaultSettingsDecrypter DefaultSettingsDecryptionRequest]
+    [org.apache.maven.settings.crypto DefaultSettingsDecrypter DefaultSettingsDecryptionRequest SettingsDecrypter]
     [org.sonatype.plexus.components.cipher DefaultPlexusCipher]
     [org.sonatype.plexus.components.sec.dispatcher DefaultSecDispatcher]
 
@@ -92,6 +92,40 @@
       mirrors)
     (.getMirror selector repo)))
 
+(def ^:private settings-decrypter
+  (delay (let [plexus-cipher (DefaultPlexusCipher.)
+               sec-dispatcher (DefaultSecDispatcher. plexus-cipher {} "~/.m2/settings-security.xml")]
+           (DefaultSettingsDecrypter. sec-dispatcher))))
+
+(defn- ^Authentication create-proxy-authentication
+  "Creates authentication with support of decryption of proxy password. Uses API and approach from
+  `org.apache.maven.internal.aether.DefaultRepositorySystemSessionFactory.newRepositorySession`.
+  See [Maven Password Encryption](https://maven.apache.org/guides/mini/guide-encryption.html) for more information."
+  [^org.apache.maven.settings.Proxy proxy]
+  (let [decryption-request (DefaultSettingsDecryptionRequest. proxy)
+        decryption-result (.decrypt ^SettingsDecrypter @settings-decrypter decryption-request)
+        ^org.apache.maven.settings.Proxy decrypted-proxy (.getProxy decryption-result)]
+    (-> (AuthenticationBuilder.)
+        (.addUsername (.getUsername decrypted-proxy))
+        (.addPassword (.getPassword decrypted-proxy))
+        (.build))))
+
+(defn- ^RemoteRepository$Builder set-server-authentication
+  "Creates authentication with support of decryption of server password, and sets it to the repository builder.
+  Uses API and approach from\n  `org.apache.maven.internal.aether.DefaultRepositorySystemSessionFactory.newRepositorySession`.
+  See [Maven Password Encryption](https://maven.apache.org/guides/mini/guide-encryption.html) for more information."
+  [^RemoteRepository$Builder builder ^Server server]
+  (let [decryption-request (DefaultSettingsDecryptionRequest. server)
+        decryption-result (.decrypt ^SettingsDecrypter @settings-decrypter decryption-request)
+        decrypted-server (.getServer decryption-result)]
+    (.setAuthentication builder
+                        (-> (AuthenticationBuilder.)
+                            (.addUsername (.getUsername decrypted-server))
+                            (.addPassword (.getPassword decrypted-server))
+                            (.addPrivateKey (.getPrivateKey decrypted-server)
+                                            (.getPassphrase decrypted-server))
+                            (.build)))))
+
 (defn- select-proxy
   ^Proxy [^Settings settings ^RemoteRepository repo]
   (->> (.getProxies settings)
@@ -101,10 +135,7 @@
                 (add (Proxy. (.getProtocol proxy-setting)
                              (.getHost proxy-setting)
                              (.getPort proxy-setting)
-                             (.. (AuthenticationBuilder.)
-                               (addUsername (.getUsername proxy-setting))
-                               (addPassword (.getPassword proxy-setting))
-                               build))
+                             (create-proxy-authentication proxy-setting))
                      (.getNonProxyHosts proxy-setting))
                 (getProxy repo)))))
     first))
@@ -132,24 +163,6 @@
                 :update update
                 :checksum checksum})))))
 
-(defn- ^RemoteRepository$Builder set-authentication
-  "Creates authentication with support of decryption of server password, and sets it to the repository builder .
-  See [Maven Password Encryption](https://maven.apache.org/guides/mini/guide-encryption.html) for more information."
-  [^RemoteRepository$Builder builder ^Server server]
-  (let [plexus-cipher (DefaultPlexusCipher.)
-        sec-dispatcher (DefaultSecDispatcher. plexus-cipher {} "~/.m2/settings-security.xml")
-        decryption-request (DefaultSettingsDecryptionRequest. server)
-        settings-decrypter (DefaultSettingsDecrypter. sec-dispatcher)
-        decryption-result (.decrypt settings-decrypter decryption-request)
-        decrypted-server (.getServer decryption-result)]
-    (.setAuthentication builder
-                        (-> (AuthenticationBuilder.)
-                            (.addUsername (.getUsername decrypted-server))
-                            (.addPassword (.getPassword decrypted-server))
-                            (.addPrivateKey (.getPrivateKey decrypted-server)
-                                            (.getPassphrase decrypted-server))
-                            (.build)))))
-
 (defn remote-repo
   (^RemoteRepository [repo-entry]
    (remote-repo repo-entry (get-settings)))
@@ -168,7 +181,7 @@
          snapshots (.setSnapshotPolicy (repo-policy name snapshots))
          releases (.setReleasePolicy (repo-policy name releases))
          mirror (.setUrl (.getUrl mirror))
-         server-setting (set-authentication server-setting)
+         server-setting (set-server-authentication server-setting)
          proxy (.setProxy proxy))
        (.build)))))
 
